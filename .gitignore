@@ -11,3 +11,5 @@ data/image*/
 *.pkl
 
 runs/*
+
+README.md 
