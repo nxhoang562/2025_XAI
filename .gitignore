@@ -5,6 +5,7 @@ __pycache__
 *.pth
 
 data/VOCdevkit/*
+data/pascaloc_2007/*
 data/image*/
 *.tar
 *.tgz
