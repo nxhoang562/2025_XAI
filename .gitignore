@@ -4,8 +4,7 @@ __pycache__
 *.pt
 *.pth
 
-data/pascaloc_2007/*
-data/image*/
+datasets/*
 *.tar
 *.tgz
 *.pkl
