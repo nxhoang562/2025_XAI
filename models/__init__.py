@@ -1,4 +1,10 @@
-from .VGG11 import vgg11_PascalVOC, vgg_preprocess, vgg11_Syntetic, vgg11_Imagenettewoof
+from .VGG11 import (
+vgg11_PascalVOC, 
+vgg_preprocess, 
+vgg11_Syntetic, 
+vgg11_Imagenettewoof    
+)
+
 from .resnet import (
     resnet18_PascalVOC,
     resnet50_PascalVOC,
