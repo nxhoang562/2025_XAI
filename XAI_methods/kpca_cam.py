@@ -1,5 +1,5 @@
-from pytorch_grad_cam.base_cam import BaseCAM
-from pytorch_grad_cam.utils.svd_on_activations import get_2d_projection_kernel
+from .XAI_utils.cam_base import BaseCAM
+from .XAI_utils.svd_on_activations import get_2d_projection_kernel
 
 class KPCA_CAM(BaseCAM):
     def __init__(self, model, target_layers, 

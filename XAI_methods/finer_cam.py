@@ -1,9 +1,9 @@
 import numpy as np
 import torch
 from typing import List
-from pytorch_grad_cam import GradCAM
-from pytorch_grad_cam.base_cam import BaseCAM
-from pytorch_grad_cam.utils.model_targets import FinerWeightedTarget
+from XAI_methods import GradCAM
+from .XAI_utils import BaseCAM
+from .XAI_utils.model_targets import FinerWeightedTarget
 
 # Finer-CAM: https://arxiv.org/pdf/2501.11309
 

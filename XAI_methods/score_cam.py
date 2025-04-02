@@ -1,6 +1,6 @@
 import torch
 import tqdm
-from pytorch_grad_cam.base_cam import BaseCAM
+from .XAI_utils.cam_base import BaseCAM
 
 
 class ScoreCAM(BaseCAM):
