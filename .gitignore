@@ -4,7 +4,6 @@ __pycache__
 *.pt
 *.pth
 
-data/VOCdevkit/*
 data/pascaloc_2007/*
 data/image*/
 *.tar

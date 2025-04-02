@@ -1,0 +1,24 @@
+# name: XAI
+# channels:
+#   - pytorch
+#   - conda-forge
+#   - defaults
+# dependencies:
+#   - python=3.10
+#   - pip
+#   - numpy=2.2.3
+#   - matplotlib=3.8.3
+#   - scikit-learn=1.3.2
+#   - psutil=5.9.5
+#   - pillow=11.1.0
+#   - tqdm=4.67.1
+#   - typing_extensions=4.12.2
+#   - pip:
+#       - torch==2.3.0
+#       - torchvision==0.18.0
+#       - captum==0.7.0
+#       - grad_cam==1.5.4
+#       - shap==0.46.0
+#       - torchsummary==1.5.1
+#       - torcheval==0.0.7
+#       - torch_receptive_field==0.1.0
