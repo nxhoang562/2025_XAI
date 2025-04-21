@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from XAI.metrics.metric_utils import MetricBase, mix_image_with_saliency
+from .metric_utils import MetricBase, mix_image_with_saliency
 
 
 

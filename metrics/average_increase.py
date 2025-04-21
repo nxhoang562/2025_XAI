@@ -1,7 +1,7 @@
 import torch
 import torch as nn
-from metric_utils import MetricBase, mix_image_with_saliency
-from utils import AttributionMethod
+from .metric_utils import MetricBase, mix_image_with_saliency
+from .utils import AttributionMethod
 
 
 
