@@ -27,9 +27,9 @@ def mix_image_with_saliency(
     - image (torch.Tensor): input image, shape (B, C, H, W)
     - saliency_map (torch.Tensor): saliency map, shape (B, C, H, W), element value is in (0,1)
     """  
-    if saliency_map.max() != 1 or saliency_map.min() != 0:
-        print(f"Saliency map should have be normalized between 0 and 1. Current max value = {saliency_map.max()}, min value = {saliency_map.min()}")
-        raise ValueError
+    # if saliency_map.max() != 1 or saliency_map.min() != 0:
+    #     print(f"Saliency map should have be normalized between 0 and 1. Current max value = {saliency_map.max()}, min value = {saliency_map.min()}")
+    #     raise ValueError
     new_image = image * saliency_map
     return new_image 
 

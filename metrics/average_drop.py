@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 from .metric_utils import MetricBase, mix_image_with_saliency
-
+import numpy as np 
+import matplotlib.pyplot as plt
 
 
 #1 Average Drop metric 
@@ -34,7 +35,9 @@ class AverageDrop(MetricBase):
         test_images = test_images.to(device)
         # plt.imshow(test_images[0].permute(1, 2, 0).detach().cpu().numpy())
         # plt.show()
-
+        
+        if isinstance(saliency_maps, np.ndarray):
+            saliency_maps = torch.tensor(saliency_maps)
         saliency_maps = saliency_maps.to(device)
         # plt.imshow(saliency_maps[0].permute(1, 2, 0).detach().cpu().numpy())
         # plt.show()
@@ -51,13 +54,13 @@ class AverageDrop(MetricBase):
             saliency_preds = nn.functional.softmax(saliency_preds, dim=1)
 
         #Select only the relevant class
-        if isinstance(labels, int):
-            test_preds = test_preds[:, labels]  # Shape: (N,)
-            saliency_preds = saliency_preds[:, labels]  # Shape: (N,)
-        elif isinstance(labels, torch.Tensor):
-            test_preds = test_preds[torch.arange(test_preds.size(0)), labels]
+        if isinstance(class_idx, int):
+            test_preds = test_preds[:, class_idx]  # Shape: (N,)
+            saliency_preds = saliency_preds[:, class_idx]  # Shape: (N,)
+        elif isinstance(class_idx, torch.Tensor):
+            test_preds = test_preds[torch.arange(test_preds.size(0)), class_idx]
             saliency_preds = saliency_preds[
-                torch.arange(saliency_preds.size(0)), labels
+                torch.arange(saliency_preds.size(0)), class_idx
             ]
         else:
             raise ValueError("class_idx should be either an int or a torch.Tensor")

@@ -1,7 +1,7 @@
 import torch
-import torch as nn
+import torch.nn as nn
 from .metric_utils import MetricBase, mix_image_with_saliency
-from .utils import AttributionMethod
+# from .utils import AttributionMethod
 
 
 
@@ -15,7 +15,6 @@ class AverageIncrease(MetricBase):
         test_images: torch.Tensor,
         saliency_maps: torch.Tensor,
         class_idx: int | torch.Tensor,
-        attribution_method: AttributionMethod,
         device: torch.device | str = "cpu",
         apply_softmax: bool = True,
         return_mean: bool = True,
