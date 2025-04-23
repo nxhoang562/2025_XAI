@@ -26,6 +26,8 @@ def calculate_metrics(
         # Tạo ảnh masked từ saliency_map (giá trị > threshold giữ nguyên, còn lại là 0)
         saliency_map_tensor = torch.tensor(saliency_map, dtype=torch.float32).unsqueeze(0).unsqueeze(0) # [1, 1, H, W]
         saliency_map_tensor = saliency_map_tensor
+        if saliency_map_tensor.device != image.device:
+            saliency_map_tensor = saliency_map_tensor.to(image.device)
         mask = (saliency_map_tensor > threshold).float()  
         masked_image = image * mask  # Chỉ giữ lại vùng saliency > threshold
 
