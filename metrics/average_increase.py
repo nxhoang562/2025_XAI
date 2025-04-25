@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
 from .metric_utils import MetricBase, mix_image_with_saliency
+import numpy as np
 # from .utils import AttributionMethod
 
 
 
 class AverageIncrease(MetricBase):
     def __init__(self):
-        super.__init__("AverageIncrease")
+        super().__init__("AverageIncrease")
     
     def __call__(
         self,
@@ -41,6 +42,8 @@ class AverageIncrease(MetricBase):
         """
 
         test_images = test_images.to(device)
+        if isinstance(saliency_maps, np.ndarray):
+            saliency_maps = torch.tensor(saliency_maps)
         saliency_maps = saliency_maps.to(device)
         saliency_images = mix_image_with_saliency(test_images, saliency_maps)
 
