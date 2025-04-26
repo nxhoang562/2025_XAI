@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import torch
 import torchvision.models as models
 import torchvision.transforms as transforms
@@ -9,6 +10,7 @@ import itertools
 import pulp
 import cvxpy as cp
 import pandas as pd 
+import os 
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
@@ -19,9 +21,19 @@ import urllib.request
 from metrics.average_drop import AverageDrop
 from metrics.average_increase import AverageIncrease
 from metrics.compute_metrics import calculate_metrics
+import cv2
+import torch.nn.functional as F
 
-# co the su dung global average pooling cho moi feature map 
-# hien tai dang chuyen thanh vector 1 chieu 
+
+def preprocess_image(image_path, device = "cpu"):
+    image = Image.open(image_path).convert("RGB")
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+    image = transform(image).unsqueeze(0)
+    return image.to(device)
 
 def group_feature_maps(
     list_feature_maps: torch.Tensor | np.ndarray,
@@ -29,6 +41,7 @@ def group_feature_maps(
     ) -> list[tuple[int, ...]]:
     
     """
+    Cluster channel maps (C, H, W) into num_clusters groups.
     Args:
         list_feature_maps (torch.Tensor or np.ndarray):
         Tensor or array of feature maps with shape (C, H, W) or (C, H*W).
@@ -37,6 +50,7 @@ def group_feature_maps(
     Returns:
         list[tuple[int, ...]]: Each tuple contains the channel indices in one cluster.
     """
+    
     if not isinstance(number_of_clusters, int):
         raise ValueError("number of clusters must be an integer")
     
@@ -52,7 +66,6 @@ def group_feature_maps(
         raise ValueError(
             f"number_of_clusters must be between 1 and {C}, got {number_of_clusters}"
         )
-        
     
     # Flatten spatial dimensions (H, W) into feature vector
     flattened = data.reshape(C, -1)  # shape: (C, H*W)
@@ -68,6 +81,7 @@ def group_feature_maps(
         groups.append(idxs)
 
     return groups
+
 
 def get_feature_maps(
     model: nn.Module,
@@ -96,6 +110,7 @@ def get_feature_maps(
         raise ValueError("Cannot extract feature maps from target_module.")
     
     return feature_maps
+    
     
 def group_last_conv_feature_maps(
     model: nn.Module,
@@ -197,7 +212,6 @@ def value_func(coalition: list[tuple[int, ...]],
     # 2) danh sách các channel phải mask = những c ∉ unmask
     mask_indices = [c for c in range(n_channels) if c not in unmask]
     # print(f"Masking channels: {mask_indices}")
-   
     # 3) chạy forward với hook
     with torch.no_grad():
         output = do_masked_forward(model, input, target_module, mask_indices, mask_value)
@@ -233,13 +247,13 @@ def compute_group_contributions(
         target_class: class mục tiêu để tính toán đóng góp
         mask_value: giá trị để mask các kênh không thuộc coalition, default = 0 
     Returns:
-      x_opt: ndarray of shape (G,)
-      epsilon_opt: the minimized maximum excess
+        x_opt: ndarray of shape (G,)
+        epsilon_opt: the minimized maximum excess
 
     """
     # 1) group feature maps
     n_channels , groups = group_last_conv_feature_maps(model, input, target_module, number_of_clusters) #e.g: groups = [(0, 1), (2, 3), (4, 5)]
-    print("Groups:", groups)
+    # print("Groups:", groups)
     # Số lượng kênh 
     G = len(groups)
 
@@ -266,15 +280,16 @@ def compute_group_contributions(
         for coal, val in v.items()
     ]
     df = pd.DataFrame(records)
-    csv_path = "/home/infres/xnguyen-24/XAI/results/coalition_values.csv"
-    df.to_csv(csv_path, index=False)
-    print(f"Coalition values saved to {csv_path}")
+    # csv_path = "results/coalition_values.csv"
+    # df.to_csv(csv_path, index=False)
+    # print(f"Coalition values saved to {csv_path}")
             
 
    # 3) Khởi tạo biến CVXPY
     x = cp.Variable(G)
     eps = cp.Variable()
-    cons = [cp.sum(x) == v[full_idx], x >= 0, eps >= 0]
+    # cons = [cp.sum(x) == v[full_idx], x >= 0, eps >= 0]
+    cons = [cp.sum(x) == v[full_idx]]
     for S, val in v.items():
         if S != full_idx:
             cons.append(cp.sum(x[list(S)]) >= val - eps)
@@ -282,11 +297,91 @@ def compute_group_contributions(
     prob = cp.Problem(cp.Minimize(eps), cons)
     prob.solve(solver=cp.SCS)
     if prob.status not in (cp.OPTIMAL, "optimal"):
-        raise RuntimeError(f"LP did not solve: {prob.status}")
+        # raise RuntimeError(f"LP did not solve: {prob.status}")
+        raise RuntimeError(f"Pre-nucleolus LP infeasible or failed: {prob.status}")
     
     group_contributions = [ {"group": groups[i], "contribution": float(x.value[i])} for i in range(G)]
     
     return x.value, eps.value,  group_contributions
+
+
+# def compute_group_contributions(
+#     model: nn.Module,
+#     input: torch.Tensor,
+#     target_module: nn.Module,
+#     number_of_clusters: int,
+#     target_class: int,
+#     mask_value: float = 0.0,
+# ):
+#     """
+#     Solve for the nucleolus allocation x ∈ R^G over G groups of feature‐maps,
+#     với các ràng buộc:
+#       • sum_i x_i = v(N)
+#       • x_i >= v({i})  (individual rationality)
+#       • for every S⊂N, sum_{i∈S} x_i >= v(S) - eps  (lexicographic‐LP slack)
+#     """
+
+#     # 1) Nhóm feature‐maps
+#     n_channels, groups = group_last_conv_feature_maps(
+#         model, input, target_module, number_of_clusters
+#     )
+#     G = len(groups)
+#     full_idx = tuple(range(G))
+
+#     # 2) Tính v(S) cho mọi coalition
+#     coalitions = []
+#     for r in range(1, G + 1):
+#         for combo in itertools.combinations(range(G), r):
+#             coalition = [groups[i] for i in combo]
+#             coalitions.append((combo, coalition))
+
+#     # Dùng dict để chứa giá trị
+#     v: dict[tuple[int, ...], float] = {}
+#     # Grand coalition
+#     v[full_idx] = value_func(
+#         groups, model, input, target_module, n_channels, target_class, mask_value
+#     )
+#     # Các coalition khác (bao gồm cả singletons)
+#     for idxs, coalition in coalitions:
+#         if idxs != full_idx:
+#             v[idxs] = value_func(
+#                 coalition, model, input, target_module, n_channels, target_class, mask_value
+#             )
+
+#     # 3) Tạo biến CVXPY
+#     x = cp.Variable(G)
+#     eps = cp.Variable()
+
+#     # 4) Khởi tạo constraints
+#     constraints = [
+#         cp.sum(x) == v[full_idx],   # efficiency
+#         eps >= 0                    # slack không âm
+#     ]
+
+#     # 4.1) Lexicographic‐LP constraints cho mọi S⊂N, S≠N
+#     for S, val in v.items():
+#         if S != full_idx:
+#             constraints.append(cp.sum(x[list(S)]) >= val - eps)
+
+#     # 4.2) Individual rationality: x[i] >= v({i})
+#     # Vì v đã chứa luôn giá trị của mọi singleton coalition (i.e. S=(i,))
+#     for i in range(G):
+#         constraints.append(x[i] >= v[(i,)])
+
+#     # 5) Giải LP
+#     prob = cp.Problem(cp.Minimize(eps), constraints)
+#     prob.solve(solver=cp.SCS)
+
+#     if prob.status not in (cp.OPTIMAL, 'optimal'):
+#         raise RuntimeError(f"LP did not solve: {prob.status}")
+
+#     # 6) Trả kết quả
+#     group_contributions = [
+#         {"group": groups[i], "contribution": float(x.value[i])}
+#         for i in range(G)
+#     ]
+#     return x.value, eps.value, group_contributions
+
 
 
 def compute_group_representatives(
@@ -310,6 +405,11 @@ def compute_group_representatives(
         representatives.append(rep)
     return torch.stack(representatives, dim=0)  # shape: (G, H, W)
 
+def softmax(contributions):
+    contributions = np.array(contributions)
+    exp_values = np.exp(contributions - np.max(contributions))  # ổn định số học
+    return exp_values / np.sum(exp_values)
+
 def compute_weighted_group_representatives(
     feature_maps: torch.Tensor, 
     groups: list[tuple[int, ...]],
@@ -330,6 +430,12 @@ def compute_weighted_group_representatives(
     if len(groups) != len(contributions):
         raise ValueError("Độ dài của groups và contributions phải bằng nhau.")
         
+    
+    # Normalize contributions to sum to 1
+    contributions = torch.tensor(contributions, dtype=torch.float32)
+    contributions /= contributions.sum()
+    # contributions_norm = softmax(contributions)
+    
     weighted_reps = []
     for group, weight in zip(groups, contributions):
         group_maps = feature_maps[list(group)]    # shape: (len(group), H, W) -> lấy feature maps theo chỉ số trong group
@@ -387,3 +493,214 @@ def compute_saliency_map(
     # 6) Resize về 224×224
     sal_map = cv2.resize(saliency_norm, (224, 224), interpolation=cv2.INTER_LINEAR)
     return sal_map# shape: (G, H, W)
+
+def list_image_paths(image_dir):
+    paths = []
+    for root, _, files in os.walk(image_dir):
+        for f in files:
+            if f.lower().endswith((".jpg",".jpeg",".png")):
+                paths.append(os.path.join(root, f))
+    return sorted(paths)
+
+def predict_top1_indices(image_paths, model, device="cpu"):
+    indices = []
+    for p in image_paths:
+        inp = preprocess_image(p, device)
+        with torch.no_grad():
+            out = model(inp)
+            _, pred = out.max(1)
+        indices.append(pred.item())
+    return indices
+
+if __name__ == "__main__": 
+    
+    # --- 1. Load model ---
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = models.resnet18(weights='IMAGENET1K_V1')# model = models.resnet18(weights='DEFAULT')
+    model.eval().to(device)
+    
+    target_layer = model.layer4[-1]
+    
+    # --- 2. Lấy danh sách đường dẫn ảnh ---
+    image_dir = "datasets/imagenet"
+    image_paths = list_image_paths(image_dir)
+    image_paths = image_paths[:50]
+    
+    # --- 3. Hàm chỉ lấy top-1 index cho mỗi ảnh ---
+    top1_idxs = predict_top1_indices(image_paths, model, device)
+    
+    # results = []  # List of tuples (path, sal_map)
+    # average_drops = []
+    # increase_confidences = []
+    
+    average_drop = AverageDrop()
+    average_increase = AverageIncrease()
+    
+    k = [2,3,4,5,6,7,8,9,10,11]
+    for c in k:
+        print(f"\n=== Processing with number of cluster =  {c}")
+        results = []  # List of tuples (path, sal_map)
+        average_drops = []
+        increase_confidences = []
+        for idx, (path, target_cls) in enumerate(zip(image_paths , top1_idxs), 1):  
+            print(f"Processing image {idx}/{len(image_paths )}: {path}")
+        # Preprocess & compute saliency
+            img_tensor = preprocess_image(path, device)
+            saliency_map = compute_saliency_map(
+                model, img_tensor, target_layer,
+                number_of_clusters=c, target_class=target_cls
+            )
+            results.append((path, saliency_map))
+        
+            drop = average_drop(
+                model=model,
+                test_images=img_tensor,
+                saliency_maps=saliency_map,
+                class_idx=target_cls,
+                device = device,
+                apply_softmax=True,
+            )
+            average_drops.append(drop)
+        
+            increase = average_increase(
+                model=model,
+                test_images=img_tensor,
+                saliency_maps=saliency_map,
+                class_idx=target_cls,
+                device = device,
+                apply_softmax=True,
+            ) 
+            # print("Increase Confidence:", increase)
+            increase_confidences.append(increase)
+    
+            # print("length of image_path", len(image_paths))
+            # print("length of top1_index", len(top1_idxs))
+            # print("length of average_drops", len(average_drops))
+            # print("length of increase_confidences", len(increase_confidences))
+        
+    
+        results = pd.DataFrame({
+        "image_path":  image_paths ,
+        "top1_index":  top1_idxs,
+        "average_drop": average_drops,
+        "increase_confidence": increase_confidences,
+        })
+        avg_drop_mean = np.mean(average_drops)
+        inc_conf_mean = np.mean(increase_confidences)
+    
+        average_row = pd.DataFrame([{
+        "image_path": "AVERAGE",
+        "top1_index": "",
+        "average_drop": avg_drop_mean,
+        "increase_confidence": inc_conf_mean
+        }])
+    
+        results_df = pd.concat([results, average_row], ignore_index=True)
+
+        # Giả sử bạn đã có dataframe results_df và biến c
+        excel_path = "results/pre-nucleolus.xlsx"
+
+        # Đảm bảo thư mục tồn tại
+        os.makedirs(os.path.dirname(excel_path), exist_ok=True)
+
+        # Kiểm tra file đã có chưa
+        file_exists = os.path.exists(excel_path)
+
+        # Thiết lập mode và tham số cho ExcelWriter
+        if file_exists:
+            # Nếu file đã tồn tại → append, cho phép if_sheet_exists
+            writer = pd.ExcelWriter(
+                excel_path,
+                engine='openpyxl',
+                mode='a',
+                if_sheet_exists='replace'  # hoặc 'new' tuỳ bạn
+                )
+        else:
+        # Nếu file chưa có → tạo mới, không dùng if_sheet_exists
+            writer = pd.ExcelWriter(
+            excel_path,
+            engine='openpyxl',
+            mode='w'
+            )
+
+            # Viết sheet
+            sheet_name = f"sum_norm_+_num_clusters_{c}"
+            with writer:
+                results_df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    # print(f"Appended sheet 'our_results' into {excel_path}")
+        
+    
+    # for idx, (path, target_cls) in enumerate(zip(image_paths , top1_idxs), 1):  
+    #     print(f"Processing image {idx}/{len(image_paths )}: {path}")
+    #     # Preprocess & compute saliency
+    #     img_tensor = preprocess_image(path, device)
+    #     saliency_map = compute_saliency_map(
+    #         model, img_tensor, target_layer,
+    #         number_of_clusters=15, target_class=target_cls
+    #     )
+    #     results.append((path, saliency_map))
+        
+    #     drop = average_drop(
+    #         model=model,
+    #         test_images=img_tensor,
+    #         saliency_maps=saliency_map,
+    #         class_idx=target_cls,
+    #         device = device,
+    #         apply_softmax=True,
+    #     )
+    #     average_drops.append(drop)
+        
+    #     increase = average_increase(
+    #         model=model,
+    #         test_images=img_tensor,
+    #         saliency_maps=saliency_map,
+    #         class_idx=target_cls,
+    #         device = device,
+    #         apply_softmax=True,
+    #     ) 
+    #     # print("Increase Confidence:", increase)
+    #     increase_confidences.append(increase)
+    
+    # # print("length of image_path", len(image_paths))
+    # # print("length of top1_index", len(top1_idxs))
+    # # print("length of average_drops", len(average_drops))
+    # # print("length of increase_confidences", len(increase_confidences))
+        
+    
+    # results = pd.DataFrame({
+    #     "image_path":  image_paths ,
+    #     "top1_index":  top1_idxs,
+    #     "average_drop": average_drops,
+    #     "increase_confidence": increase_confidences,
+    # })
+    # avg_drop_mean = np.mean(average_drops)
+    # inc_conf_mean = np.mean(increase_confidences)
+    
+    # average_row = pd.DataFrame([{
+    # "image_path": "AVERAGE",
+    # "top1_index": "",
+    # "average_drop": avg_drop_mean,
+    # "increase_confidence": inc_conf_mean
+    # }])
+    
+    # results_df = pd.concat([results, average_row], ignore_index=True)
+
+    # excel_path = "results/results.xlsx"
+    # with pd.ExcelWriter(excel_path,
+    #                 engine='openpyxl',
+    #                 mode='a',                  
+    #                 if_sheet_exists='replace'  # hoặc 'new' nếu bạn muốn giữ sheet cũ và tạo sheet mới có tên trùng lặp
+    #                ) as writer:
+    #     results_df.to_excel(writer,
+    #                     sheet_name='k_15',  # đổi tên sheet tuỳ bạn
+    #                     index=False)
+    # print(f"Appended sheet 'our_results' into {excel_path}")
+    
+    
+    
+        
+
+    
+    
+    

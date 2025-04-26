@@ -1,0 +1,1 @@
+1. co the su dung global average pooling cho moi feature map hien tai dang chuyen thanh vector 1 chieu 

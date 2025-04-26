@@ -158,7 +158,7 @@ if __name__ == "__main__":
     
     results_df = pd.concat([results, average_row], ignore_index=True)
 
-    excel_path = "results/gradcam.xlsx"
+    excel_path = "results/results.xlsx"
     results_df.to_excel(excel_path, index=False)
 
     print(f"Saved to path: {excel_path}")
