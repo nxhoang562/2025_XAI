@@ -604,7 +604,7 @@ if __name__ == "__main__":
 
     # --- 2. Lấy danh sách đường dẫn ảnh ---
     image_dir = "datasets/imagenet"
-    image_paths = list_image_paths(image_dir)[:50]
+    image_paths = list_image_paths(image_dir)[:100]
 
     # --- 3. Hàm chỉ lấy top-1 index cho mỗi ảnh ---
     top1_idxs = predict_top1_indices(image_paths, model, device)
@@ -612,8 +612,8 @@ if __name__ == "__main__":
     average_drop = AverageDrop()
     average_increase = AverageIncrease()
 
-    k_values = [5,6,7,8,9,10,11,15]
-    excel_path = "results/baseline_pre_nucleolus.xlsx"
+    k_values = [8,9,10,11,15,20]
+    excel_path = "results/100img_baseline_pre_nucleolus.xlsx"
     os.makedirs(os.path.dirname(excel_path), exist_ok=True)
 
     for c in k_values:
