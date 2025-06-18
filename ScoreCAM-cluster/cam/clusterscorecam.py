@@ -11,17 +11,22 @@ class ClusterScoreCAM(BaseCAM):
         model_dict: dict giống BaseCAM
         num_clusters: số lượng cụm K
     """
-    def __init__(self, model_dict, num_clusters=5):
+    def __init__(self, model_dict, num_clusters=10):
         super().__init__(model_dict)
         self.K = num_clusters
 
     def forward(self, input, class_idx=None, retain_graph=False):
+       
         b, c, h, w = input.size()
+        
         # 1) forward gốc + chọn class
         logits = self.model_arch(input)
         if class_idx is None:
+            
             class_idx = logits.argmax(dim=1).item()
         score = logits[0, class_idx]
+        
+        
         # backward để lấy activations
         self.model_arch.zero_grad()
         score.backward(retain_graph=retain_graph)
@@ -62,18 +67,19 @@ class ClusterScoreCAM(BaseCAM):
                 probs = F.softmax(out, dim=1)
                 cluster_scores[c_idx] = probs[0, class_idx]
 
-        # 5) reconstruct heatmap: dùng rep * score
-        heatmap = torch.zeros(1, 1, h, w, device=activations.device)
+        # 5) reconstruct saliency_map: dùng rep * score
+        saliency_map = torch.zeros(1, 1, h, w, device=activations.device)
         for lbl in range(self.K):
-            heatmap += cluster_scores[lbl] * rep_maps[lbl].unsqueeze(0).unsqueeze(0)
+            saliency_map += cluster_scores[lbl] * rep_maps[lbl].unsqueeze(0).unsqueeze(0)
 
         # 6) post-process
-        heatmap = F.relu(heatmap)
-        mn, mx = heatmap.min(), heatmap.max()
+        saliency_map = F.relu(saliency_map)
+        mn, mx = saliency_map.min(), saliency_map.max()
         if mn == mx:
             return None
-        heatmap = (heatmap - mn) / (mx - mn)
-        return heatmap
+        saliency_mapp = (saliency_map - mn) / (saliency_map - mn)
+       
+        return saliency_map
 
     def __call__(self, input, class_idx=None, retain_graph=False):
         return self.forward(input, class_idx, retain_graph)
