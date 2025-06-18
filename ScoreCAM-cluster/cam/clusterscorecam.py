@@ -46,7 +46,7 @@ class ClusterScoreCAM(BaseCAM):
                 maps.append((m - m.min()) / (m.max() - m.min()))
 
         # stack và flatten
-        all_maps = torch.stack(maps, dim=0).view(nc, -1).cpu().numpy()
+        all_maps = torch.stack(maps, dim=0).view(nc, -1).detach().cpu().numpy()
 
         # 3) clustering
         kmeans = KMeans(n_clusters=self.K, random_state=0).fit(all_maps)
@@ -77,7 +77,7 @@ class ClusterScoreCAM(BaseCAM):
         mn, mx = saliency_map.min(), saliency_map.max()
         if mn == mx:
             return None
-        saliency_mapp = (saliency_map - mn) / (saliency_map - mn)
+        saliency_map = (saliency_map - mn) / (mx - mn)
        
         return saliency_map
 
