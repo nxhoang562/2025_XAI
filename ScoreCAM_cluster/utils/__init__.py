@@ -597,3 +597,56 @@ def find_layer(arch, target_layer_name):
         raise Exception("Invalid target layer name.")
     target_layer = arch._modules[target_layer_name]
     return target_layer
+
+
+#============================================# 
+
+# File: ScoreCAM_cluster/utils/data_utils.py
+
+import os
+import glob
+from PIL import Image
+import torch
+import torchvision.transforms as T
+
+def list_image_paths(image_dir: str) -> list[str]:
+    """
+    Trả về danh sách đường dẫn ảnh trong thư mục (phần mở rộng png/jpg/jpeg).
+    """
+    exts = ('.png', '.jpg', '.jpeg', '.JPEG')
+    return [
+        os.path.join(image_dir, f)
+        for f in os.listdir(image_dir)
+        if f.endswith(exts)
+    ]
+
+def preprocess_image(path: str, device: str) -> torch.Tensor:
+    """
+    Load ảnh RGB, resize về 224×224, normalize và trả về tensor (1,C,H,W) trên device.
+    """
+    img = Image.open(path).convert('RGB')
+    transform = T.Compose([
+        T.Resize((224,224)),
+        T.ToTensor(),
+        T.Normalize(mean=[0.485,0.456,0.406],
+                    std =[0.229,0.224,0.225]),
+    ])
+    inp = transform(img).unsqueeze(0).to(device)
+    return inp
+
+def predict_top1_indices(
+    image_paths: list[str],
+    model: torch.nn.Module,
+    device: str
+) -> list[int]:
+    """
+    Dự đoán nhãn top-1 (index) cho mỗi ảnh trong list.
+    """
+    model = model.to(device).eval()
+    idxs = []
+    for p in image_paths:
+        inp = preprocess_image(p, device)
+        with torch.no_grad():
+            logits = model(inp)
+            idxs.append(int(logits.argmax(dim=1).item()))
+    return idxs

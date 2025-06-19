@@ -8,13 +8,13 @@ import torchvision.models as models
 import pandas as pd
 import numpy as np
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
-from ScoreCAM_cluster.utils import load_image, apply_transforms, basic_visualize, list_image_paths, predict_top1_indices, preprocess_image
-from ScoreCAM_cluster.cam.clusterscorecam import ClusterScoreCAM
-from metrics.metric_utils import AverageDrop, AverageIncrease
+from utils import (
+    load_image, apply_transforms, basic_visualize,
+    list_image_paths, preprocess_image, predict_top1_indices
+)
+from cam.clusterscorecam import ClusterScoreCAM
+from metrics.average_drop import AverageDrop
+from metrics.average_increase import AverageIncrease
 
 
 def test_single_image(
@@ -90,6 +90,9 @@ def batch_test(
 
     # --- danh sách ảnh và nhãn top1 ---
     image_paths = list_image_paths(image_dir)[:top_n]
+    if not image_paths:
+        raise RuntimeError(f"No images found in {image_dir} (top_n={top_n})")
+    
     top1_idxs = predict_top1_indices(image_paths, model, device)
 
     # chuẩn bị file Excel
@@ -148,7 +151,8 @@ if __name__ == "__main__":
         'layer_name': 'layer4',
         'input_size': (224,224)
     }
-    image_dir = "datasets/imagenet"
-    excel_path = "results/100img_baseline_pre_nucleolus.xlsx"
-    k_vals = [8,9,10,11,15,20]
-    batch_test(model, model_dict, image_dir, excel_path, k_vals, top_n=100)
+    image_dir = "/home/infres/xnguyen-24/XAI/datasets/imagenet"
+    num_image = 50
+    excel_path = f"/home/infres/xnguyen-24/XAI/ScoreCAM_cluster/results/{num_image}img.xlsx"
+    k_vals = [8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]
+    batch_test(model, model_dict, image_dir, excel_path, k_vals, top_n=num_image)
