@@ -152,6 +152,6 @@ if __name__ == "__main__":
     }
     image_dir = "/home/infres/xnguyen-24/XAI/datasets/imagenet"
     num_image = 50
-    excel_path = f"/home/infres/xnguyen-24/XAI/ScoreCAM_cluster/results/{num_image}img_ignorenegativediff.xlsx"
-    k_vals = [25]
+    excel_path = f"/home/infres/xnguyen-24/XAI/ScoreCAM_cluster/results/{num_image}img_50drop.xlsx"
+    k_vals = list(range(10, 251, 5))
     batch_test(model, model_dict, image_dir, excel_path, k_vals, top_n=num_image)
