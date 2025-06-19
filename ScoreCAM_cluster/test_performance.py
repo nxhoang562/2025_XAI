@@ -13,6 +13,7 @@ from utils import (
     list_image_paths, preprocess_image, predict_top1_indices
 )
 from cam.clusterscorecam import ClusterScoreCAM
+from cam.clusterscorecam2 import ClusterScoreCAM2
 from metrics.average_drop import AverageDrop
 from metrics.average_increase import AverageIncrease
 
@@ -29,7 +30,7 @@ def test_single_image(
     model = model.to(device).eval()
 
     # khởi tạo CAM và metric
-    cam = ClusterScoreCAM(model_dict, num_clusters=num_clusters)
+    cam = ClusterScoreCAM2(model_dict, num_clusters=num_clusters)
     avg_drop = AverageDrop()
     avg_inc = AverageIncrease()
 
@@ -78,9 +79,7 @@ def test_single_image(
     return drop_val, inc_val
 
 
-def batch_test(
-    model, model_dict, image_dir, excel_path, k_values, top_n=100
-):
+def batch_test( model, model_dict, image_dir, excel_path, k_values, top_n=100):
     """
     Test ClusterScoreCAM trên nhiều ảnh và nhiều giá trị K, lưu kết quả vào Excel theo sheet.
     """
@@ -105,7 +104,7 @@ def batch_test(
             # preprocess_image sẽ load + transform + unsqueeze
             img_tensor = preprocess_image(path, device)
             # compute saliency map
-            sal_map = ClusterScoreCAM(model_dict, num_clusters=c)(
+            sal_map = ClusterScoreCAM2(model_dict, num_clusters=c)(
                 img_tensor, class_idx=cls
             )
             sal_map = sal_map.cpu().squeeze(0)
@@ -131,14 +130,14 @@ def batch_test(
         df = pd.concat([df, avg_row], ignore_index=True)
 
         # ghi Excel
-        sheet = f"sum_norm_num_clusters_{c}"
+        sheet = f"num_clusters_{c}"
         mode = "a" if os.path.exists(excel_path) else "w"
         with pd.ExcelWriter(
             excel_path, engine="openpyxl", mode=mode,
             if_sheet_exists="replace" if mode=="a" else None
         ) as writer:
             df.to_excel(writer, sheet_name=sheet, index=False)
-        print(f"→ Saved sheet `{sheet}` in {excel_path}")
+        print(f"Saved sheet {sheet} in {excel_path}")
 
 
 if __name__ == "__main__":
@@ -153,6 +152,6 @@ if __name__ == "__main__":
     }
     image_dir = "/home/infres/xnguyen-24/XAI/datasets/imagenet"
     num_image = 50
-    excel_path = f"/home/infres/xnguyen-24/XAI/ScoreCAM_cluster/results/{num_image}img.xlsx"
-    k_vals = [8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]
+    excel_path = f"/home/infres/xnguyen-24/XAI/ScoreCAM_cluster/results/{num_image}img_ignorenegativediff.xlsx"
+    k_vals = [8,9,10,15,16,17,21,23,24,25]
     batch_test(model, model_dict, image_dir, excel_path, k_vals, top_n=num_image)
