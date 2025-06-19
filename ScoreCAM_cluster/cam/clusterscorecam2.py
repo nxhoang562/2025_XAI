@@ -67,7 +67,7 @@ class ClusterScoreCAM2(BaseCAM):
      
                 out_mask = self.model_arch(input * mask)         # (1, num_classes)
                 raw_score = out_mask[0, class_idx]               # logit của lớp mục tiêu
-                diff = raw_score - score                # chênh lệch so với gốc
+                diff = raw_score                # chênh lệch so với gốc
 
                 # nếu diff > 0 thì softmax và lấy xác suất, ngược lại giữ 0
                 if diff.item() > 0:
